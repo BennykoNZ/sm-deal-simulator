@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Metering — Deal Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#0c0f16;--bg2:#131926;--bg3:#1a2235;--bg4:#202c42;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#eef0f5;--text2:#8893a8;--text3:#505c72;
+  --accent:#3d9bff;--accent2:#1a72e0;
+  --green:#21c55d;--red:#f04444;--amber:#f5a020;--purple:#a07cf5;--teal:#26d4be;
+  --r:10px;--rl:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* ── DEAL PICKER OVERLAY ── */
+#deal-picker{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:100;display:flex;align-items:center;justify-content:center;}
+.picker-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;}
+.picker-head{padding:24px 26px 18px;border-bottom:1px solid var(--border);}
+.picker-head h2{font-size:18px;font-weight:600;margin-bottom:4px;}
+.picker-head p{font-size:13px;color:var(--text2);}
+.picker-body{padding:20px 26px;overflow-y:auto;flex:1;}
+.picker-footer{padding:16px 26px;border-top:1px solid var(--border);display:flex;gap:10px;}
+.deal-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px;}
+.deal-card:hover{border-color:var(--accent);background:var(--bg4);}
+.deal-card.new-deal{border-style:dashed;border-color:var(--border2);}
+.deal-card.new-deal:hover{border-color:var(--green);}
+.deal-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.deal-info{flex:1;min-width:0;}
+.deal-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.deal-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.deal-status{font-size:11px;padding:2px 8px;border-radius:4px;flex-shrink:0;}
+.deal-actions{display:flex;gap:6px;margin-left:auto;}
+
+/* ── APP ── */
+.app{display:flex;min-height:100vh;}
+.sidebar{width:210px;min-width:210px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+
+/* customer header in sidebar */
+.cust-header{padding:14px 14px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s;}
+.cust-header:hover{background:var(--bg3);}
+.cust-avatar{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;margin-bottom:8px;}
+.cust-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cust-sub{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px;}
+.cust-switch{font-size:10px;color:var(--accent);margin-top:4px;}
+
+.nav{padding:10px 6px;flex:1;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;margin-bottom:1px;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:rgba(61,155,255,.13);color:var(--accent);}
+.nav-icon{font-size:14px;width:18px;text-align:center;}
+.nav-section{font-size:10px;color:var(--text3);padding:10px 10px 3px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;}
+.nav-bottom{padding:12px;border-top:1px solid var(--border);}
+
+.main{flex:1;overflow-y:auto;}
+.panel{display:none;padding:26px 30px;}
+.panel.active{display:block;}
+.section-title{font-size:19px;font-weight:600;margin-bottom:3px;}
+.section-sub{font-size:13px;color:var(--text2);margin-bottom:22px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px 20px;margin-bottom:14px;}
+.card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:7px 10px;outline:none;transition:border .15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+select{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238893a8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
+select option{background:var(--bg3);}
+textarea{resize:vertical;min-height:80px;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-label{font-size:13px;color:var(--text);}
+.toggle-sub{font-size:11px;color:var(--text3);}
+.toggle{position:relative;width:36px;height:20px;display:inline-block;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--bg3);border-radius:20px;border:1px solid var(--border2);transition:.2s;}
+.toggle-slider:before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.2s;}
+.toggle input:checked+.toggle-slider{background:var(--accent);border-color:var(--accent);}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px);background:white;}
+.metric{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;}
+.metric-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:5px;}
+.metric-value{font-size:20px;font-weight:600;font-family:'DM Mono',monospace;}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.metric.green .metric-value{color:var(--green);}
+.metric.blue .metric-value{color:var(--accent);}
+.metric.purple .metric-value{color:var(--purple);}
+.metric.red .metric-value{color:var(--red);}
+.rates-table{width:100%;border-collapse:collapse;font-size:13px;}
+.rates-table th{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;padding:5px 8px;text-align:left;}
+.rates-table td{padding:7px 8px;border-top:1px solid var(--border);vertical-align:middle;}
+.rates-table tr:hover td{background:rgba(255,255,255,.02);}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;font-weight:500;}
+.badge-blue{background:rgba(61,155,255,.15);color:var(--accent);}
+.badge-green{background:rgba(33,197,93,.15);color:var(--green);}
+.badge-red{background:rgba(240,68,68,.15);color:var(--red);}
+.badge-gray{background:var(--bg3);color:var(--text3);}
+.badge-calc{background:rgba(160,124,245,.15);color:var(--purple);}
+.capex-row{display:grid;grid-template-columns:2fr 65px 96px 96px 70px 26px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.capex-row:last-child{border-bottom:none;}
+.capex-row.hdr{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding-bottom:7px;}
+.capex-row input{padding:5px 7px;font-size:12px;}
+.slider-wrap{padding:3px 0;}
+input[type=range]{width:100%;height:4px;appearance:none;background:var(--bg3);border-radius:4px;outline:none;border:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);cursor:pointer;transition:transform .1s;}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+.slider-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:3px;}
+.chart-wrap{position:relative;width:100%;}
+.output-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);}
+.output-line{display:flex;justify-content:space-between;padding:3px 0;}
+.output-line .val{color:var(--text);font-weight:500;}
+.output-line.total{border-top:1px solid var(--border);margin-top:6px;padding-top:7px;}
+.output-line.total .val{color:var(--green);font-size:13px;}
+.tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--bg3);padding:3px;border-radius:var(--r);width:fit-content;}
+.tab{padding:5px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;}
+.tab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.info-row{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;background:rgba(61,155,255,.06);border-radius:var(--r);border:1px solid rgba(61,155,255,.15);margin-bottom:12px;}
+.info-row .ii{font-size:14px;flex-shrink:0;margin-top:1px;}
+.info-row .it{font-size:12px;color:var(--text2);}
+.year-bar{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
+.year-bar:last-child{border-bottom:none;}
+.year-lbl{font-size:12px;color:var(--text3);width:44px;flex-shrink:0;font-family:'DM Mono',monospace;}
+.year-track{flex:1;height:26px;background:var(--bg3);border-radius:6px;display:flex;overflow:hidden;}
+.year-fill{height:100%;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:white;transition:width .5s;min-width:0;white-space:nowrap;overflow:hidden;}
+.year-amt{font-size:12px;font-family:'DM Mono',monospace;color:var(--text2);width:86px;text-align:right;}
+.tag{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:4px;margin-right:4px;margin-bottom:4px;}
+.tag-blue{background:rgba(61,155,255,.12);color:var(--accent);}
+.tag-green{background:rgba(33,197,93,.12);color:var(--green);}
+.tag-amber{background:rgba(245,160,32,.12);color:var(--amber);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.btn:hover{background:var(--bg2);border-color:var(--accent);color:var(--accent);}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:white;}
+.btn-primary:hover{background:var(--accent2);border-color:var(--accent2);color:white;}
+.btn-green{background:rgba(33,197,93,.15);border-color:var(--green);color:var(--green);}
+.btn-green:hover{background:rgba(33,197,93,.25);}
+.btn-danger{background:transparent;border-color:var(--red);color:var(--red);}
+.btn-sm{padding:4px 10px;font-size:12px;}
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.rate-display{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;font-size:12px;}
+.rate-cell{background:var(--bg2);padding:9px 11px;}
+.rate-cell-head{background:var(--bg3);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;}
+.rate-cell-val{font-family:'DM Mono',monospace;font-weight:500;color:var(--text);font-size:13px;}
+.rate-cell-gst{font-size:11px;color:var(--text3);}
+.scrollable{max-height:260px;overflow-y:auto;}
+.scrollable::-webkit-scrollbar{width:4px;}
+.scrollable::-webkit-scrollbar-track{background:var(--bg3);}
+.scrollable::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.eq-pill{padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.eq-pill:hover{border-color:var(--accent);color:var(--accent);}
+.eq-pill.active{background:rgba(61,155,255,.15);border-color:var(--accent);color:var(--accent);font-weight:500;}
+.ai-box textarea{min-height:90px;background:var(--bg);border-color:var(--border);}
+.ai-status{font-size:12px;padding:6px 10px;border-radius:6px;margin-top:8px;display:none;}
+.ai-status.loading{display:block;background:rgba(245,160,32,.1);color:var(--amber);}
+.ai-status.success{display:block;background:rgba(33,197,93,.1);color:var(--green);}
+.ai-status.error{display:block;background:rgba(240,68,68,.1);color:var(--red);}
+.svc-card{cursor:pointer;transition:all .15s;border:2px solid transparent !important;}
+.svc-card.selected{border-color:var(--accent) !important;}
+.svc-card:hover{background:rgba(255,255,255,.03);}
+/* status colors */
+.status-won{background:rgba(33,197,93,.15);color:var(--green);}
+.status-lost{background:rgba(240,68,68,.15);color:var(--red);}
+.status-proposal{background:rgba(61,155,255,.15);color:var(--accent);}
+.status-default{background:var(--bg3);color:var(--text3);}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     DEAL PICKER OVERLAY
+══════════════════════════════════════════ -->
+<div id="deal-picker">
+  <div class="picker-box">
+    <div class="picker-head">
+      <h2>Smart Metering — Deal Simulator</h2>
+      <p>Select a recent deal or start a new one</p>
+    </div>
+    <div class="picker-body" id="picker-list"></div>
+    <div class="picker-footer">
+      <button class="btn btn-primary" onclick="newDeal()">+ New Deal</button>
+      <button class="btn" onclick="document.getElementById('file-load').click()">📂 Load from Drive</button>
+      <input type="file" id="file-load" accept=".json" style="display:none" onchange="loadFromFile(event)">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════════ -->
+<div class="app" id="main-app" style="display:none">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <!-- Customer header - click to switch -->
+  <div class="cust-header" onclick="openPicker()">
+    <div class="cust-avatar" id="sb-avatar">F</div>
+    <div class="cust-name" id="sb-name">Forte Apartments</div>
+    <div class="cust-sub" id="sb-sub">Multi Tenant · Proposal</div>
+    <div class="cust-switch">↕ Switch deal</div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-section">Setup</div>
+    <div class="nav-item active" onclick="showPanel('customer',this)"><span class="nav-icon">🏢</span>Customer</div>
+    <div class="nav-item" onclick="showPanel('deal',this)"><span class="nav-icon">📋</span>Deal Info</div>
+    <div class="nav-item" onclick="showPanel('rates',this)"><span class="nav-icon">💧</span>Water Rates</div>
+    <div class="nav-section">Pricing</div>
+    <div class="nav-item" onclick="showPanel('capex',this)"><span class="nav-icon">🔧</span>CAPEX</div>
+    <div class="nav-item" onclick="showPanel('equipment',this)"><span class="nav-icon">📦</span>Equipment DB</div>
+    <div class="nav-section">Outputs</div>
+    <div class="nav-item" onclick="showPanel('simulator',this)"><span class="nav-icon">📊</span>Simulator</div>
+    <div class="nav-item" onclick="showPanel('proposal',this)"><span class="nav-icon">📄</span>Proposal View</div>
+  </div>
+
+  <div class="nav-bottom">
+    <button class="btn btn-sm btn-green" onclick="autosave()" style="width:100%;justify-content:center;margin-bottom:6px">💾 Save Deal</button>
+    <button class="btn btn-sm" onclick="exportJSON()" style="width:100%;justify-content:center;margin-bottom:6px">⬇ Export to Drive</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteDeal()" style="width:100%;justify-content:center">🗑 Delete Deal</button>
+  </div>
+</nav>
+
+<!-- MAIN PANELS -->
+<div class="main">
+
+<!-- ── CUSTOMER ── -->
+<div class="panel active" id="panel-customer">
+  <div class="section-title">Customer Information</div>
+  <div class="section-sub">Basic details for this deal</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Customer Details</div>
+      <div class="field"><label>Customer / Building Name</label><input type="text" id="cust-name" value="Forte Apartments" oninput="updateSidebar()"></div>
+      <div class="field"><label>Address (Street)</label><input type="text" id="cust-address" value="37 Symonds Street"></div>
+      <div class="field"><label>Suburb</label><input type="text" id="cust-suburb" value="Grafton"></div>
+      <div class="field"><label>Town / City</label><input type="text" id="cust-town" value="Auckland"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Contact</div>
+      <div class="field"><label>Main Contact Name</label><input type="text" id="cust-contact" value="Maria Cooper"></div>
+      <div class="field"><label>Contact Role</label><input type="text" id="cust-role" value="Body Corporate Member"></div>
+      <div class="field"><label>Phone</label><input type="text" id="cust-phone" value="+64210526600"></div>
+      <div class="field"><label>Email</label><input type="text" id="cust-email" value="fortebodycorp@gmail.com"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Sector &amp; Pipeline</div>
+    <div class="grid3">
+      <div class="field"><label>Sector</label>
+        <select id="sector" onchange="updateSidebar()">
+          <option value="multi">Multi Tenant Building</option>
+          <option value="commercial">Commercial</option>
+          <option value="multi-commercial">Multi Tenant + Commercial</option>
+          <option value="industrial">Industrial</option>
+          <option value="agriculture">Agriculture</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Proposal Status</label>
+        <select id="status" onchange="updateSidebar()">
+          <option>New</option><option>Qualified</option><option>Site Meeting</option>
+          <option selected>Smart Metering Proposal</option><option>Negotiation</option>
+          <option>Contract</option><option>Won</option><option>Lost</option><option>Holding Pattern</option>
+        </select>
+      </div>
+      <div class="field"><label>Win Probability</label>
+        <select id="win-prob">
+          <option value="0.05">5% — New</option><option value="0.10">10% — Qualified</option>
+          <option value="0.40">40% — Site Meeting</option><option value="0.50">50% — Holding Pattern</option>
+          <option value="0.70" selected>70% — Proposal</option><option value="0.80">80% — Negotiation</option>
+          <option value="0.90">90% — Contract</option><option value="1.00">100% — Won</option>
+          <option value="0.00">0% — Lost</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DEAL INFO ── -->
+<div class="panel" id="panel-deal">
+  <div class="section-title">Deal Information</div>
+  <div class="section-sub">Units, services, and contract terms</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Units</div>
+      <div class="field"><label>Total Units</label><input type="number" id="total-units" value="33" oninput="onTotalUnits()"></div>
+      <div class="field"><label>Apartments / Residential</label><input type="number" id="apartments" value="25"></div>
+      <div class="field"><label>Communal Areas</label><input type="number" id="communal" value="5"></div>
+      <div class="field"><label>Commercial Units <small style="color:var(--text3)">(enables Rate 2)</small></label><input type="number" id="commercial-units" value="3" oninput="checkRate2()"></div>
+      <div class="field"><label>Other</label><input type="number" id="other-units" value="0"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Services</div>
+      <div class="toggle-row"><div><div class="toggle-label">Cold Water</div></div><label class="toggle"><input type="checkbox" id="svc-cold" checked onchange="syncServices()"><span class="toggle-slider"></span></label></div>
+      <div class="toggle-row"><div><div class="toggle-label">Hot Water</div></div><label class="toggle"><input type="checkbox" id="svc-hot" checked onchange="syncServices()"><span class="toggle-slider"></span></label></div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Gas</div><div class="toggle-sub">Cost usually baked into hot water rate</div></div>
+        <label class="toggle"><input type="checkbox" id="svc-gas" onchange="syncServices()"><span class="toggle-slider"></span></label>
+      </div>
+      <div id="gas-sep-wrap" style="display:none;padding:6px 0 0">
+        <div class="toggle-row"><div><div class="toggle-label" style="font-size:12px;color:var(--text2)">Bill gas separately (exception)</div></div><label class="toggle"><input type="checkbox" id="gas-separate"><span class="toggle-slider"></span></label></div>
+      </div>
+      <div class="toggle-row"><div><div class="toggle-label">Power / Electricity</div></div><label class="toggle"><input type="checkbox" id="svc-power"><span class="toggle-slider"></span></label></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Ongoing Service Model</div>
+    <div class="grid3">
+      <div class="metric svc-card selected" id="svc-opt-billing" onclick="setService('billing')">
+        <div class="metric-label">Full Billing</div>
+        <div class="metric-value blue">$10<span style="font-size:12px;color:var(--text2)">/unit/mo</span></div>
+        <div class="metric-sub">SM takes over billing</div>
+      </div>
+      <div class="metric svc-card" id="svc-opt-data" onclick="setService('data')">
+        <div class="metric-label">Data Only</div>
+        <div class="metric-value" style="color:var(--text2)">$5<span style="font-size:12px">/unit/mo</span></div>
+        <div class="metric-sub">Reads only, no billing</div>
+      </div>
+      <div class="metric svc-card" id="svc-opt-hardware" onclick="setService('hardware')">
+        <div class="metric-label">Hardware Only</div>
+        <div class="metric-value" style="color:var(--text3)">$0/mo</div>
+        <div class="metric-sub">No ongoing services</div>
+      </div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Contract Terms</div>
+      <div class="field"><label>Expected Start Date</label><input type="text" id="start-date" value="2026-03-01"></div>
+      <div class="field">
+        <label>Contract Length: <span id="contract-len-label" style="color:var(--accent);font-family:'DM Mono',monospace">5 years</span></label>
+        <div class="slider-wrap"><input type="range" id="contract-len" min="1" max="10" value="5" oninput="updateContractLen()"><div class="slider-labels"><span>1 yr</span><span>5 yr</span><span>10 yr</span></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Meters to Install</div>
+      <div class="info-row"><span class="ii">ℹ️</span><span class="it">Configure meters in the <strong>CAPEX</strong> tab — select manufacturer, model, and diameter there. Totals shown below are calculated from CAPEX.</span></div>
+      <div id="meter-summary" style="font-size:13px;color:var(--text2)">
+        <!-- populated by renderMeterSummary() -->
+      </div>
+    </div>
+  </div>
+  <div id="rate2-notice" class="info-row" style="display:none">
+    <span class="ii">🏪</span><span class="it"><strong>Rate 2 active</strong> — commercial units detected. Set commercial rates in the Water Rates tab.</span>
+  </div>
+</div>
+
+<!-- ── WATER RATES ── -->
+<div class="panel" id="panel-rates">
+  <div class="section-title">Water Rates &amp; Charges</div>
+  <div class="section-sub">Blue = enter manually. Purple = auto-calculated. These rates are what the customer sees.</div>
+  <div class="card">
+    <div class="card-title">⚡ AI Invoice Parser</div>
+    <div class="ai-box">
+      <div class="info-row" style="margin-bottom:10px"><span class="ii">💡</span><span class="it">Paste text from a Watercare invoice — totals, rates, usage figures. The AI extracts what it can and fills the form. Everything is editable after.</span></div>
+      <textarea id="invoice-text" placeholder="Paste invoice text here&#10;&#10;e.g. 'Annual Watercare invoice $68,985 incl GST. Cold water $2.18/kL, wastewater $3.99/kL, supply charge $0.11/day. Total usage 1,200 kL/year, 137 apartments.'"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button class="btn btn-primary" onclick="parseInvoice()">Parse with AI</button>
+        <button class="btn" onclick="document.getElementById('invoice-text').value=''">Clear</button>
+        <div id="ai-status" class="ai-status"></div>
+      </div>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchRateTab('actual')">Actual Invoice</div>
+    <div class="tab" onclick="switchRateTab('default')">Default Estimates</div>
+  </div>
+  <div id="rate-tab-actual">
+    <div class="card">
+      <div class="card-title">Watercare / Provider Invoice (your cost)</div>
+      <div class="info-row"><span class="ii">💰</span><span class="it">You pay this bulk invoice. Tenants pay you individually. The difference between what you collect and what you pay Watercare is your water margin.</span></div>
+      <div class="grid2">
+        <div class="field"><label>Annual Invoice (NZD incl. GST)</label><input type="number" id="wc-annual" value="68985" oninput="calcFromAnnual()"></div>
+        <div class="field"><label>Monthly Invoice (NZD incl. GST)</label><input type="number" id="wc-monthly" placeholder="= annual ÷ 12" oninput="calcFromMonthly()"></div>
+      </div>
+      <div class="field" style="max-width:340px"><label>Annual Gas / Energy for Water Heating (NZD) — your cost</label><input type="number" id="energy-annual" value="36000"></div>
+    </div>
+  </div>
+  <div id="rate-tab-default" style="display:none">
+    <div class="card">
+      <div class="card-title">Default Usage Estimates</div>
+      <div class="info-row"><span class="ii">⚠️</span><span class="it">Using defaults. Get the actual Watercare invoice for accurate pricing.</span></div>
+      <div class="grid3">
+        <div class="field"><label>Daily water use per unit (L)</label><input type="number" id="def-usage-l" value="150"></div>
+        <div class="field"><label>Cold %</label><input type="number" id="def-cold-pct" value="70"></div>
+        <div class="field"><label>Hot %</label><input type="number" id="def-hot-pct" value="30"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">Rate 1 — Residential / Standard</div>
+    <table class="rates-table">
+      <thead><tr><th>Charge</th><th>Incl. GST (shown to customer)</th><th>Excl. GST</th><th>Type</th><th>Meters #</th></tr></thead>
+      <tbody>
+        <tr><td>Supply Charge / Day</td><td><input type="number" id="r1-supply-gst" value="0.15" step="0.001" style="width:80px" oninput="eg('r1-supply')"></td><td><span id="r1-supply-ex" class="badge badge-calc">0.1304</span></td><td><span class="badge badge-blue">Manual</span></td><td>—</td></tr>
+        <tr><td>Cold Water / kL</td><td><input type="number" id="r1-cold-gst" value="2.20" step="0.01" style="width:80px" oninput="eg('r1-cold')"></td><td><span id="r1-cold-ex" class="badge badge-calc">1.9130</span></td><td><span class="badge badge-blue">Manual</span></td><td id="r1-cold-m">—</td></tr>
+        <tr><td>Hot Water / kL</td><td><input type="number" id="r1-hot-gst" value="18.20" step="0.01" style="width:80px" oninput="eg('r1-hot')"></td><td><span id="r1-hot-ex" class="badge badge-calc">15.826</span></td><td><span class="badge badge-blue">Manual</span></td><td id="r1-hot-m">—</td></tr>
+        <tr><td>Wastewater / kL</td><td><input type="number" id="r1-waste-gst" value="3.81" step="0.001" style="width:80px" oninput="eg('r1-waste')"></td><td><span id="r1-waste-ex" class="badge badge-calc">3.3130</span></td><td><span class="badge badge-blue">Manual</span></td><td>—</td></tr>
+        <tr><td>SM Service Fee / month</td><td><input type="number" id="r1-service-gst" value="11.50" step="0.50" style="width:80px" oninput="eg('r1-service')"></td><td><span id="r1-service-ex" class="badge badge-calc">10.000</span></td><td><span class="badge badge-green">SM Rate</span></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="rate2-block" class="card" style="display:none;margin-top:14px">
+    <div class="card-title">Rate 2 — Commercial Units</div>
+    <table class="rates-table">
+      <thead><tr><th>Charge</th><th>Incl. GST</th><th>Excl. GST</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td>Supply Charge / Day</td><td><input type="number" id="r2-supply-gst" value="0.15" step="0.001" style="width:80px" oninput="eg('r2-supply')"></td><td><span id="r2-supply-ex" class="badge badge-calc">0.1304</span></td><td><span class="badge badge-blue">Manual</span></td></tr>
+        <tr><td>Cold Water / kL</td><td><input type="number" id="r2-cold-gst" value="2.20" step="0.01" style="width:80px" oninput="eg('r2-cold')"></td><td><span id="r2-cold-ex" class="badge badge-calc">1.9130</span></td><td><span class="badge badge-blue">Manual</span></td></tr>
+        <tr><td>Hot Water / kL</td><td><input type="number" id="r2-hot-gst" value="18.20" step="0.01" style="width:80px" oninput="eg('r2-hot')"></td><td><span id="r2-hot-ex" class="badge badge-calc">15.826</span></td><td><span class="badge badge-blue">Manual</span></td></tr>
+        <tr><td>Wastewater / kL</td><td><input type="number" id="r2-waste-gst" value="3.81" step="0.001" style="width:80px" oninput="eg('r2-waste')"></td><td><span id="r2-waste-ex" class="badge badge-calc">3.3130</span></td><td><span class="badge badge-blue">Manual</span></td></tr>
+        <tr><td>SM Service Fee / month</td><td><input type="number" id="r2-service-gst" value="11.50" step="0.50" style="width:80px" oninput="eg('r2-service')"></td><td><span id="r2-service-ex" class="badge badge-calc">10.000</span></td><td><span class="badge badge-green">SM Rate</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">Usage Variables</div>
+    <div class="grid3">
+      <div class="field"><label>Avg cold water / unit / month (kL)</label><input type="number" id="avg-cold-kl" value="3.15" step="0.01"></div>
+      <div class="field"><label>Avg hot water / unit / month (kL)</label><input type="number" id="avg-hot-kl" value="0.945" step="0.001"></div>
+      <div class="field"><label>Wastewater % (of cold volume)</label><input type="number" id="waste-pct" value="78"></div>
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="field"><label>Watercare annual increase %</label><input type="number" id="wc-inc-pct" value="9.5" step="0.1"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CAPEX ── -->
+<div class="panel" id="panel-capex">
+  <div class="section-title">CAPEX — Installation &amp; Equipment</div>
+  <div class="section-sub">Equipment, installation, base stations, and setup fees</div>
+  <div class="grid4" style="margin-bottom:16px">
+    <div class="metric"><div class="metric-label">Total Our Cost</div><div class="metric-value" id="cap-our-cost">$0</div></div>
+    <div class="metric green"><div class="metric-label">Total Sell Price</div><div class="metric-value" id="cap-sell-price">$0</div></div>
+    <div class="metric blue"><div class="metric-label">Gross Profit</div><div class="metric-value" id="cap-profit">$0</div></div>
+    <div class="metric purple"><div class="metric-label">Margin</div><div class="metric-value" id="cap-margin">0%</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Currency Conversion</div>
+    <div class="grid4">
+      <div class="field"><label>USD → NZD</label><input type="number" id="fx-usd" value="1.67" step="0.01" oninput="recalcAll()"></div>
+      <div class="field"><label>AUD → NZD</label><input type="number" id="fx-aud" value="1.07" step="0.01" oninput="recalcAll()"></div>
+      <div class="field"><label>EUR → NZD</label><input type="number" id="fx-eur" value="1.78" step="0.01" oninput="recalcAll()"></div>
+      <div class="field"><label>GBP → NZD</label><input type="number" id="fx-gbp" value="2.09" step="0.01" oninput="recalcAll()"></div>
+    </div>
+  </div>
+  <div id="capex-sections"></div>
+</div>
+
+<!-- ── EQUIPMENT DB ── -->
+<div class="panel" id="panel-equipment">
+  <div class="section-title">Equipment Database</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+    <div class="section-sub" style="margin-bottom:0">Reference prices. Global — shared across all deals. Changes save automatically.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" onclick="exportDB()" title="Export DB as JSON for Drive backup">⬇ Export DB</button>
+      <button class="btn btn-sm" onclick="document.getElementById('db-import').click()" title="Import DB from JSON">⬆ Import DB</button>
+      <input type="file" id="db-import" accept=".json" style="display:none" onchange="importDB(event)">
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Add Equipment</div>
+    <div class="grid3">
+      <div class="field"><label>Category</label><select id="eq-cat"><option value="cold">Cold Water Meter</option><option value="hot">Hot Water Meter</option><option value="power">Power Meter</option><option value="gas">Gas Meter</option><option value="pulse">Pulse Unit</option><option value="config">Config & Installation</option><option value="base">Base Station</option><option value="other">Other</option></select></div>
+      <div class="field"><label>Name / Model</label><input type="text" id="eq-name" placeholder="DN20 Ultrasonic Cold Meter"></div>
+      <div class="field"><label>Manufacturer</label><input type="text" id="eq-mfr" placeholder="Smart Metering"></div>
+    </div>
+    <div class="grid4">
+      <div class="field"><label>Diameter</label><select id="eq-diam"><option value="">—</option><option value="DN15">DN15 (15mm)</option><option value="DN20">DN20 (20mm)</option><option value="DN25">DN25 (25mm)</option><option value="DN32">DN32 (32mm)</option><option value="DN40">DN40 (40mm)</option><option value="DN50">DN50 (50mm)</option><option value="DN80">DN80 (80mm)</option><option value="other">Other</option></select></div>
+      <div class="field"><label>Buy Price (foreign)</label><input type="number" id="eq-buy" placeholder="92"></div>
+      <div class="field"><label>Currency</label><select id="eq-ccy"><option value="NZD">NZD</option><option value="USD" selected>USD</option><option value="AUD">AUD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></div>
+      <div class="field"><label>Recommended Sell (NZD)</label><input type="number" id="eq-sell" placeholder="115"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addEquipment()" style="margin-top:6px">Add to Database</button>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Equipment List</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="eq-filter-pills">
+        <button class="eq-pill active" onclick="setEqFilter('all',this)">All</button>
+        <button class="eq-pill" onclick="setEqFilter('cold',this)">Cold</button>
+        <button class="eq-pill" onclick="setEqFilter('hot',this)">Hot</button>
+        <button class="eq-pill" onclick="setEqFilter('power',this)">Power</button>
+        <button class="eq-pill" onclick="setEqFilter('gas',this)">Gas</button>
+        <button class="eq-pill" onclick="setEqFilter('pulse',this)">Pulse</button>
+        <button class="eq-pill" onclick="setEqFilter('config',this)">Config</button>
+        <button class="eq-pill" onclick="setEqFilter('base',this)">Base</button>
+        <button class="eq-pill" onclick="setEqFilter('other',this)">Other</button>
+      </div>
+    </div>
+    <div id="eq-table"></div>
+  </div>
+</div>
+
+<!-- ── SIMULATOR ── -->
+<div class="panel" id="panel-simulator">
+  <div class="section-title">Deal Simulator</div>
+  <div class="section-sub">Live P&amp;L and cashflow. Adjust sliders to scenario-test.</div>
+  <div class="grid4" style="margin-bottom:16px">
+    <div class="metric green"><div class="metric-label">Total Deal Revenue</div><div class="metric-value" id="sim-total-rev">$0</div><div class="metric-sub" id="sim-total-sub">over 5 yrs</div></div>
+    <div class="metric blue"><div class="metric-label">CAPEX Revenue</div><div class="metric-value" id="sim-capex-rev">$0</div><div class="metric-sub">recognised Y1</div></div>
+    <div class="metric purple"><div class="metric-label">Ongoing / yr</div><div class="metric-value" id="sim-ongoing-rev">$0</div><div class="metric-sub">excl. GST</div></div>
+    <div class="metric" id="sim-profit-card"><div class="metric-label">Net Profit</div><div class="metric-value" id="sim-profit">$0</div><div class="metric-sub" id="sim-profit-sub">0%</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Cashflow by Year (NZD excl. GST)</div>
+    <div class="info-row"><span class="ii">💡</span><span class="it">CAPEX: 50% on acceptance + 50% on install, both cash in Y1. Ongoing: annual service fee revenue spread across contract.</span></div>
+    <div class="chart-wrap" style="height:230px"><canvas id="cf-chart"></canvas></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)"><span style="color:var(--accent)">■</span> CAPEX &nbsp;<span style="color:var(--purple)">■</span> Ongoing &nbsp;<span style="color:var(--green)">—</span> Net Profit</div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="card">
+      <div class="card-title">Revenue by Year</div>
+      <div id="year-bars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Revenue Mix</div>
+      <div class="chart-wrap" style="height:170px"><canvas id="mix-chart"></canvas></div>
+      <div id="mix-legend" style="margin-top:8px;font-size:11px;color:var(--text3)"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">Scenario Testing — drag to simulate</div>
+    <div class="grid2">
+      <div>
+        <div class="field">
+          <label>Service fee / unit / month: <span id="svc-fee-val" style="color:var(--accent);font-family:'DM Mono',monospace">$10.00</span></label>
+          <div class="slider-wrap"><input type="range" id="sim-svc-fee" min="0" max="25" value="10" step="0.5" oninput="onSvcFee()"><div class="slider-labels"><span>$0</span><span>$10</span><span>$25</span></div></div>
+        </div>
+        <div class="field">
+          <label>Billing units: <span id="sim-units-val" style="color:var(--accent);font-family:'DM Mono',monospace">33</span></label>
+          <div class="slider-wrap"><input type="range" id="sim-units" min="1" max="500" value="33" oninput="onSimUnits()"><div class="slider-labels"><span>1</span><span>250</span><span>500</span></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Contract length: <span id="sim-len-val" style="color:var(--accent);font-family:'DM Mono',monospace">5 yrs</span></label>
+          <div class="slider-wrap"><input type="range" id="sim-len" min="1" max="10" value="5" oninput="onSimLen()"><div class="slider-labels"><span>1</span><span>5</span><span>10</span></div></div>
+        </div>
+        <div class="field">
+          <label>CAPEX price multiplier: <span id="cap-mult-val" style="color:var(--accent);font-family:'DM Mono',monospace">1.00×</span></label>
+          <div class="slider-wrap"><input type="range" id="sim-cap-mult" min="0.5" max="2" value="1" step="0.05" oninput="onCapMult()"><div class="slider-labels"><span>0.5×</span><span>1×</span><span>2×</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">Detailed P&amp;L</div>
+    <div id="pnl-detail" class="output-box"></div>
+  </div>
+</div>
+
+<!-- ── PROPOSAL VIEW ── -->
+<div class="panel" id="panel-proposal">
+  <div class="section-title">Proposal Output</div>
+  <div class="section-sub">Customer-facing rate summary. Copy numbers into your Word or Canva proposal.</div>
+  <div class="card">
+    <div class="card-title">Customer: <span id="prop-name" style="color:var(--text);font-weight:600;text-transform:none">—</span></div>
+    <div id="prop-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px"></div>
+    <div class="divider"></div>
+    <div class="card-title" style="margin-top:14px">Rate 1 — Residential / Standard</div>
+    <div class="rate-display" id="prop-rate1"></div>
+    <div id="prop-rate2-wrap" style="display:none">
+      <div class="card-title" style="margin-top:18px">Rate 2 — Commercial</div>
+      <div class="rate-display" id="prop-rate2"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="card-title">CAPEX Summary</div>
+    <div id="prop-capex" class="output-box" style="margin-bottom:14px"></div>
+    <div class="card-title">Ongoing Service</div>
+    <div id="prop-ongoing" class="output-box"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">DocLink Values (copy to Word proposal)</div>
+    <div id="prop-doclink" class="output-box scrollable" style="max-height:280px"></div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const S = {
+  id: null,          // current deal ID (uuid)
+  svcType: 'billing',
+  svcFee: 10,
+  simUnits: 33,
+  simLen: 5,
+  capMult: 1,
+  cfChart: null,
+  mixChart: null,
+  capexData: {
+    cold:   [{ name:'DN20 Ultrasonic Cold Meter', qty:20, cost:92, sell:110 }],
+    hot:    [],
+    power:  [],
+    gas:    [],
+    pulse:  [],
+    config: [],
+    base:   [],
+    other:  [{ name:'Platform Setup Fee', qty:1, cost:1000, sell:3500 }],
+  },
+  equipDB: [
+    { cat:'cold', name:'DN15 Ultrasonic Cold Meter', mfr:'Smart Metering', diam:'DN15', ccy:'NZD', buy:87, sell:109 },
+    { cat:'cold', name:'DN20 Ultrasonic Cold Meter', mfr:'Smart Metering', diam:'DN20', ccy:'NZD', buy:92, sell:115 },
+    { cat:'cold', name:'Bove Smart Meter 20mm', mfr:'Bove', diam:'DN20', ccy:'USD', buy:57, sell:119 },
+    { cat:'cold', name:'HYDRODIGIT-S1 DN20 (B-Meter)', mfr:'B-Meter', diam:'DN20', ccy:'NZD', buy:234.42, sell:293 },
+    { cat:'hot', name:'DN20 Valve Control Ultrasonic', mfr:'Smart Metering', diam:'DN20', ccy:'NZD', buy:154, sell:193 },
+    { cat:'hot', name:'DN15 Valve Control Ultrasonic', mfr:'Smart Metering', diam:'DN15', ccy:'NZD', buy:145, sell:181 },
+    { cat:'hot', name:'Bove Valve Meter 20mm (B97 VPW)', mfr:'Bove', diam:'DN20', ccy:'USD', buy:87, sell:182 },
+    { cat:'power', name:'Single Phase LoRaWAN SDM230', mfr:'Eastron', diam:'', ccy:'NZD', buy:90, sell:113 },
+    { cat:'power', name:'3 Phase LoRaWAN SDM630MCT', mfr:'Eastron', diam:'', ccy:'NZD', buy:148, sell:185 },
+    { cat:'pulse', name:'LoRaWAN Pulse Unit v2 (923MHz)', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:180, sell:225 },
+    { cat:'pulse', name:'LoRaWAN Pulse Unit v3 (923MHz)', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:160, sell:200 },
+    { cat:'pulse', name:'NB-IoT Pulse Unit', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:191, sell:239 },
+    { cat:'pulse', name:'Dry Contacts (Adeunis)', mfr:'Adeunis', diam:'', ccy:'NZD', buy:155, sell:194 },
+    { cat:'base', name:'UG67 LoRaWAN Outdoor (923MHz)', mfr:'Milesight', diam:'', ccy:'NZD', buy:995, sell:1470 },
+    { cat:'base', name:'UG56 LoRaWAN Indoor (923MHz)', mfr:'Milesight', diam:'', ccy:'NZD', buy:500, sell:980 },
+    { cat:'base', name:'Basestation Installation (UG67)', mfr:'', diam:'', ccy:'NZD', buy:300, sell:900 },
+    { cat:'base', name:'Basestation Installation (UG56)', mfr:'', diam:'', ccy:'NZD', buy:150, sell:500 },
+    { cat:'base', name:'POE Injector', mfr:'Milesight', diam:'', ccy:'NZD', buy:35, sell:70 },
+    { cat:'config', name:'Setup of Cold Water Meter', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:5, sell:20 },
+    { cat:'config', name:'Setup of Hot Water Meter', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:5, sell:20 },
+    { cat:'config', name:'Setup of Pulse Unit', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:1, sell:1 },
+    { cat:'config', name:'Install of Pulse Unit', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:1, sell:35 },
+    { cat:'config', name:'Plumbing Installation', mfr:'Smart Metering', diam:'', ccy:'NZD', buy:136.66, sell:150 },
+    { cat:'config', name:'Brass Water Meter Tail & Nut', mfr:'', diam:'', ccy:'NZD', buy:28, sell:35 },
+    { cat:'config', name:'Brass to PEX Transition Fitting', mfr:'', diam:'', ccy:'NZD', buy:5, sell:10 },
+    { cat:'config', name:'Hatch: Cutting Additional Access', mfr:'', diam:'', ccy:'NZD', buy:48.50, sell:80 },
+    { cat:'other', name:'Platform Setup Fee', mfr:'', diam:'', ccy:'NZD', buy:1000, sell:3500 },
+    { cat:'other', name:'Hayden Setup Costs', mfr:'', diam:'', ccy:'NZD', buy:500, sell:1000 },
+  ],
+};
+
+// ═══════════════════════════════════════════════
+// LOCAL STORAGE DEAL MANAGEMENT
+// ═══════════════════════════════════════════════
+const LS_KEY = 'sm_deals_v3';
+const LS_DB_KEY = 'sm_equipdb_v3';   // global Equipment DB — separate from deals
+
+// ── Equipment DB persistence ──────────────────
+function loadGlobalDB() {
+  try {
+    const raw = localStorage.getItem(LS_DB_KEY);
+    if(raw) {
+      const saved = JSON.parse(raw);
+      if(saved.items && saved.items.length > 0) {
+        S.equipDB = saved.items;
+        return saved.updatedAt || 0;
+      }
+    }
+  } catch {}
+  return 0;
+}
+
+function saveGlobalDB() {
+  const payload = { items: S.equipDB, updatedAt: Date.now() };
+  localStorage.setItem(LS_DB_KEY, JSON.stringify(payload));
+}
+
+// Call this whenever the DB changes
+function onDBChange() {
+  saveGlobalDB();
+  renderEqTable();
+  renderMeterSummary();
+}
+
+function getAllDeals() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveDealToLS(id, data) {
+  const deals = getAllDeals();
+  deals[id] = data;
+  localStorage.setItem(LS_KEY, JSON.stringify(deals));
+}
+
+function deleteDealFromLS(id) {
+  const deals = getAllDeals();
+  delete deals[id];
+  localStorage.setItem(LS_KEY, JSON.stringify(deals));
+}
+
+function uuid() {
+  return 'deal_' + Math.random().toString(36).substr(2,9) + '_' + Date.now();
+}
+
+// ═══════════════════════════════════════════════
+// DEAL PICKER
+// ═══════════════════════════════════════════════
+function openPicker() {
+  renderPicker();
+  document.getElementById('deal-picker').style.display = 'flex';
+}
+
+function closePicker() {
+  document.getElementById('deal-picker').style.display = 'none';
+}
+
+function renderPicker() {
+  const deals = getAllDeals();
+  const list = document.getElementById('picker-list');
+  const entries = Object.entries(deals).sort((a,b) => (b[1].savedAt||0) - (a[1].savedAt||0));
+
+  if(entries.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No saved deals yet. Start a new one below.</div>';
+    return;
+  }
+
+  const statusColors = {
+    'Won':'status-won','Lost':'status-lost','Smart Metering Proposal':'status-proposal',
+    'Contract':'status-won','Negotiation':'status-proposal',
+  };
+
+  list.innerHTML = entries.map(([id, d]) => {
+    const sColor = statusColors[d.status] || 'status-default';
+    const avatar = (d.name||'?')[0].toUpperCase();
+    const sector = {multi:'Multi Tenant',commercial:'Commercial','multi-commercial':'Multi+Commercial',industrial:'Industrial',agriculture:'Agriculture'}[d.sector] || d.sector || '—';
+    const savedDate = d.savedAt ? new Date(d.savedAt).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'}) : 'Not saved';
+    const totalRev = d.totalRev ? '$' + Math.round(d.totalRev).toLocaleString('en-NZ') : '—';
+    return `<div class="deal-card" onclick="loadDealById('${id}')">
+      <div class="deal-icon" style="background:rgba(61,155,255,.15);color:var(--accent)">${avatar}</div>
+      <div class="deal-info">
+        <div class="deal-name">${d.name || 'Unnamed Deal'}</div>
+        <div class="deal-meta">${sector} · ${d.units||0} units · ${totalRev} total · Saved ${savedDate}</div>
+      </div>
+      <span class="deal-status badge ${sColor}">${d.status||'—'}</span>
+      <div class="deal-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-sm" onclick="exportDealById('${id}')" title="Export JSON">⬇</button>
+        <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="confirmDeleteDeal('${id}')" title="Delete">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function newDeal() {
+  S.id = uuid();
+  resetToDefaults();
+  closePicker();
+  document.getElementById('main-app').style.display = 'flex';
+  updateSidebar();
+}
+
+function loadDealById(id) {
+  const deals = getAllDeals();
+  const d = deals[id];
+  if(!d) return;
+  S.id = id;
+  applyDealData(d);
+  closePicker();
+  document.getElementById('main-app').style.display = 'flex';
+  updateSidebar();
+}
+
+function confirmDeleteDeal(id) {
+  const deals = getAllDeals();
+  const name = deals[id]?.name || 'this deal';
+  if(confirm('Delete "' + name + '"? This cannot be undone.')) {
+    deleteDealFromLS(id);
+    if(S.id === id) { S.id = null; }
+    renderPicker();
+  }
+}
+
+function exportDealById(id) {
+  const deals = getAllDeals();
+  const d = deals[id];
+  if(!d) return;
+  const blob = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (d.name||'deal').replace(/\s+/g,'-').toLowerCase() + '-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+// ═══════════════════════════════════════════════
+// AUTOSAVE (saves current state to localStorage)
+// ═══════════════════════════════════════════════
+function autosave() {
+  if(!S.id) S.id = uuid();
+  const { sell } = getCapexTotals();
+  const ongoing = getOngoingRev();
+  const totalRev = sell + ongoing * S.simLen;
+  const data = {
+    ...getFormValues(),
+    svcType: S.svcType, svcFee: S.svcFee,
+    simUnits: S.simUnits, simLen: S.simLen, capMult: S.capMult,
+    capexData: S.capexData,
+    // Embed DB snapshot with timestamp for cross-computer sync
+    equipDB: S.equipDB,
+    equipDBUpdatedAt: Date.now(),
+    // metadata for picker
+    name: gvs('cust-name'),
+    sector: gvs('sector'),
+    status: gvs('status'),
+    units: gvi('total-units'),
+    totalRev,
+    savedAt: Date.now(),
+  };
+  saveDealToLS(S.id, data);
+  saveGlobalDB(); // always persist DB changes globally too
+  const btn = document.querySelector('.nav-bottom .btn-green');
+  if(btn) { const orig = btn.textContent; btn.textContent = '✓ Saved!'; setTimeout(()=>btn.textContent=orig, 1200); }
+}
+
+function exportJSON() {
+  if(!S.id) autosave();
+  exportDealById(S.id);
+}
+
+function deleteDeal() {
+  const name = gvs('cust-name') || 'this deal';
+  if(!confirm('Delete "' + name + '" from browser? You can still load from a JSON file on Drive.')) return;
+  if(S.id) deleteDealFromLS(S.id);
+  openPicker();
+  document.getElementById('main-app').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════
+// FORM VALUES EXTRACTION / APPLICATION
+// ═══════════════════════════════════════════════
+const FIELDS = ['cust-name','cust-address','cust-suburb','cust-town','cust-contact','cust-role','cust-phone','cust-email',
+  'sector','status','win-prob','total-units','apartments','communal','commercial-units','other-units',
+  'contract-len','start-date',
+  'r1-supply-gst','r1-cold-gst','r1-hot-gst','r1-waste-gst','r1-service-gst',
+  'r2-supply-gst','r2-cold-gst','r2-hot-gst','r2-waste-gst','r2-service-gst',
+  'wc-annual','wc-monthly','energy-annual','avg-cold-kl','avg-hot-kl','waste-pct','wc-inc-pct',
+  'fx-usd','fx-aud','fx-eur','fx-gbp','def-usage-l','def-cold-pct','def-hot-pct'];
+const TOGGLES = ['svc-cold','svc-hot','svc-gas','svc-power','gas-separate'];
+
+function getFormValues() {
+  const v = {};
+  FIELDS.forEach(id => { v[id] = gvs(id); });
+  TOGGLES.forEach(id => { const e=document.getElementById(id); if(e) v[id+'_c'] = e.checked; });
+  return v;
+}
+
+function applyDealData(d) {
+  FIELDS.forEach(id => { if(d[id] !== undefined) { const e=document.getElementById(id); if(e) e.value=d[id]; } });
+  TOGGLES.forEach(id => { if(d[id+'_c'] !== undefined) { const e=document.getElementById(id); if(e) e.checked=d[id+'_c']; } });
+  if(d.capexData) S.capexData = d.capexData;
+
+  // Global DB sync: if the deal carries a newer DB, offer to update
+  if(d.equipDB && d.equipDB.length > 0) {
+    const localDBTime = parseInt(localStorage.getItem(LS_DB_KEY + '_ts') || '0');
+    const dealDBTime = d.equipDBUpdatedAt || 0;
+    if(dealDBTime > localDBTime + 60000) { // >1 min newer
+      const accept = confirm(
+        `This deal has a newer Equipment DB (updated ${new Date(dealDBTime).toLocaleDateString('en-NZ', {day:'numeric',month:'short',year:'numeric'})}).\n\nUpdate your local Equipment DB to match?\n\nClick OK to update, Cancel to keep your current DB.`
+      );
+      if(accept) {
+        S.equipDB = d.equipDB;
+        saveGlobalDB();
+        localStorage.setItem(LS_DB_KEY + '_ts', dealDBTime);
+      }
+    } else if(localDBTime === 0) {
+      // First time — no local DB yet, just use what's in the deal silently
+      S.equipDB = d.equipDB;
+      saveGlobalDB();
+    }
+    // else: local DB is current or newer, keep it
+  }
+
+  if(d.svcType) setService(d.svcType);
+  if(d.svcFee !== undefined) { S.svcFee = d.svcFee; setv('sim-svc-fee', d.svcFee); set('svc-fee-val','$'+Number(d.svcFee).toFixed(2)); }
+  if(d.simUnits) { S.simUnits = d.simUnits; setv('sim-units', d.simUnits); set('sim-units-val', d.simUnits); }
+  if(d.simLen) { S.simLen = d.simLen; setv('sim-len', d.simLen); set('sim-len-val', d.simLen+' yrs'); }
+  if(d.capMult) { S.capMult = d.capMult; setv('sim-cap-mult', d.capMult); set('cap-mult-val', Number(d.capMult).toFixed(2)+'×'); }
+  initExGst(); updateContractLen(); checkRate2(); syncServices();
+  renderCapexSections(); renderEqTable(); renderMeterSummary();
+}
+
+function resetToDefaults() {
+  FIELDS.forEach(id => {
+    const e = document.getElementById(id);
+    if(!e) return;
+    const defaults = {
+      'cust-name':'','cust-address':'','cust-suburb':'','cust-town':'Auckland',
+      'sector':'multi','status':'New','win-prob':'0.05',
+      'total-units':'10','apartments':'10','communal':'0','commercial-units':'0','other-units':'0',
+      'contract-len':'5','start-date':'2026-01-01',
+      'r1-supply-gst':'0.15','r1-cold-gst':'2.20','r1-hot-gst':'18.20','r1-waste-gst':'3.81','r1-service-gst':'11.50',
+      'r2-supply-gst':'0.15','r2-cold-gst':'2.20','r2-hot-gst':'18.20','r2-waste-gst':'3.81','r2-service-gst':'11.50',
+      'wc-annual':'','wc-monthly':'','energy-annual':'0',
+      'avg-cold-kl':'3.15','avg-hot-kl':'0.945','waste-pct':'78','wc-inc-pct':'9.5',
+      'fx-usd':'1.67','fx-aud':'1.07','fx-eur':'1.78','fx-gbp':'2.09',
+    };
+    if(defaults[id] !== undefined) e.value = defaults[id];
+  });
+  document.getElementById('svc-cold').checked = true;
+  document.getElementById('svc-hot').checked = false;
+  document.getElementById('svc-gas').checked = false;
+  document.getElementById('svc-power').checked = false;
+  S.capexData = { cold:[], hot:[], power:[], gas:[], pulse:[], config:[], base:[], other:[{ name:'Platform Setup Fee', qty:1, cost:1000, sell:3500 }] };
+  S.svcType='billing'; S.svcFee=10; S.simUnits=10; S.simLen=5; S.capMult=1;
+  setService('billing');
+  setv('sim-svc-fee', 10); set('svc-fee-val','$10.00');
+  setv('sim-units', 10); set('sim-units-val','10');
+  setv('sim-len', 5); set('sim-len-val','5 yrs');
+  setv('sim-cap-mult', 1); set('cap-mult-val','1.00×');
+  initExGst(); updateContractLen(); checkRate2(); syncServices();
+  renderCapexSections(); renderEqTable(); renderMeterSummary();
+}
+
+function loadFromFile(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if(!d.savedAt) d.savedAt = Date.now(); // legacy files
+      if(!d.name) d.name = file.name.replace('.json','');
+      // generate id if missing
+      const id = d._id || uuid();
+      d._id = id;
+      S.id = id;
+      saveDealToLS(id, d);
+      applyDealData(d);
+      closePicker();
+      document.getElementById('main-app').style.display = 'flex';
+      updateSidebar();
+    } catch(err) { alert('Could not load file: ' + err.message); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// SIDEBAR UPDATE
+// ═══════════════════════════════════════════════
+function updateSidebar() {
+  const name = gvs('cust-name') || 'New Deal';
+  const avatar = name[0].toUpperCase();
+  const sector = {multi:'Multi Tenant',commercial:'Commercial','multi-commercial':'Multi+Commercial',industrial:'Industrial',agriculture:'Agriculture'}[gvs('sector')] || 'Deal';
+  const status = gvs('status') || '—';
+  set('sb-avatar', avatar);
+  set('sb-name', name);
+  set('sb-sub', sector + ' · ' + status);
+  // also update avatar bg based on status
+  const colors = { Won:'#21c55d', Lost:'#f04444', Contract:'#21c55d', 'Smart Metering Proposal':'var(--accent)' };
+  document.getElementById('sb-avatar').style.background = colors[status] || 'var(--accent)';
+}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+const nzd = v => '$' + Math.round(v).toLocaleString('en-NZ');
+const nzdf = (v,d=2) => '$' + Number(v).toFixed(d);
+const pct = v => (v*100).toFixed(1) + '%';
+const gv = id => parseFloat(document.getElementById(id)?.value) || 0;
+const gvi = id => parseInt(document.getElementById(id)?.value) || 0;
+const gvs = id => document.getElementById(id)?.value || '';
+const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+const setv = (id,v) => { const e=document.getElementById(id); if(e) e.value=v; };
+
+function fx(ccy) {
+  const r = { NZD:1, USD:gv('fx-usd')||1.67, AUD:gv('fx-aud')||1.07, EUR:gv('fx-eur')||1.78, GBP:gv('fx-gbp')||2.09 };
+  return r[ccy] || 1;
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showPanel(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  if(id==='simulator') renderSimulator();
+  if(id==='proposal') renderProposal();
+  if(id==='equipment') renderEqTable();
+  if(id==='capex') renderCapexSections();
+}
+
+// ═══════════════════════════════════════════════
+// EX-GST
+// ═══════════════════════════════════════════════
+function eg(prefix) {
+  const inc = gv(prefix+'-gst');
+  set(prefix+'-ex', (inc/1.15).toFixed(4));
+}
+function initExGst() {
+  ['r1-supply','r1-cold','r1-hot','r1-waste','r1-service','r1-power',
+   'r2-supply','r2-cold','r2-hot','r2-waste','r2-service'].forEach(p => eg(p));
+}
+
+// ═══════════════════════════════════════════════
+// SERVICE TYPE
+// ═══════════════════════════════════════════════
+function setService(type) {
+  S.svcType = type;
+  ['billing','data','hardware'].forEach(t => document.getElementById('svc-opt-'+t).classList.toggle('selected', t===type));
+  const fee = type==='billing' ? 10 : type==='data' ? 5 : 0;
+  S.svcFee = fee;
+  setv('sim-svc-fee', fee);
+  set('svc-fee-val', '$'+fee.toFixed(2));
+}
+
+function syncServices() {
+  document.getElementById('gas-sep-wrap').style.display = document.getElementById('svc-gas').checked ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════
+// UNITS / CONTRACT
+// ═══════════════════════════════════════════════
+function onTotalUnits() {
+  const n = gvi('total-units');
+  S.simUnits = n;
+  setv('sim-units', n);
+  set('sim-units-val', n);
+}
+function updateContractLen() {
+  const v = gvi('contract-len');
+  S.simLen = v;
+  set('contract-len-label', v+' year'+(v!==1?'s':''));
+  setv('sim-len', v);
+  set('sim-len-val', v+' yrs');
+}
+function checkRate2() {
+  const show = gvi('commercial-units') > 0;
+  document.getElementById('rate2-notice').style.display = show ? 'flex' : 'none';
+  document.getElementById('rate2-block').style.display = show ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════
+// INVOICE / RATES
+// ═══════════════════════════════════════════════
+function switchRateTab(mode) {
+  document.querySelectorAll('#panel-rates .tab').forEach((t,i) => t.classList.toggle('active', i===(mode==='actual'?0:1)));
+  document.getElementById('rate-tab-actual').style.display = mode==='actual'?'block':'none';
+  document.getElementById('rate-tab-default').style.display = mode==='default'?'block':'none';
+}
+function calcFromAnnual() { const a=gv('wc-annual'); if(a>0) setv('wc-monthly',(a/12).toFixed(2)); }
+function calcFromMonthly() { const m=gv('wc-monthly'); if(m>0) setv('wc-annual',(m*12).toFixed(2)); }
+
+// ═══════════════════════════════════════════════
+// AI INVOICE PARSER
+// ═══════════════════════════════════════════════
+async function parseInvoice() {
+  const text = document.getElementById('invoice-text').value.trim();
+  if(!text) return;
+  const status = document.getElementById('ai-status');
+  status.className = 'ai-status loading';
+  status.textContent = '⚡ Parsing with AI...';
+  const prompt = `Extract pricing data from this Watercare/utility invoice. Return ONLY a JSON object, no markdown, no explanation:
+{
+  "wc_annual_incl_gst": number or null,
+  "wc_monthly_incl_gst": number or null,
+  "supply_charge_per_day_incl_gst": number or null,
+  "cold_water_per_kl_incl_gst": number or null,
+  "hot_water_per_kl_incl_gst": number or null,
+  "wastewater_per_kl_incl_gst": number or null,
+  "avg_cold_kl_per_unit_per_month": number or null,
+  "avg_hot_kl_per_unit_per_month": number or null,
+  "energy_annual": number or null
+}
+Invoice text: ${text}`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:400, messages:[{role:'user',content:prompt}] })
+    });
+    const data = await res.json();
+    const raw = data.content?.find(b=>b.type==='text')?.text || '';
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const applied = [];
+    const map = {
+      wc_annual_incl_gst:['wc-annual','calcFromAnnual'],
+      wc_monthly_incl_gst:['wc-monthly','calcFromMonthly'],
+      supply_charge_per_day_incl_gst:['r1-supply-gst','eg:r1-supply'],
+      cold_water_per_kl_incl_gst:['r1-cold-gst','eg:r1-cold'],
+      hot_water_per_kl_incl_gst:['r1-hot-gst','eg:r1-hot'],
+      wastewater_per_kl_incl_gst:['r1-waste-gst','eg:r1-waste'],
+      avg_cold_kl_per_unit_per_month:['avg-cold-kl',null],
+      avg_hot_kl_per_unit_per_month:['avg-hot-kl',null],
+      energy_annual:['energy-annual',null],
+    };
+    Object.entries(map).forEach(([k,[fieldId, action]]) => {
+      if(parsed[k] !== null && parsed[k] !== undefined) {
+        setv(fieldId, Number(parsed[k]).toFixed(4));
+        if(action === 'calcFromAnnual') calcFromAnnual();
+        else if(action === 'calcFromMonthly') calcFromMonthly();
+        else if(action && action.startsWith('eg:')) eg(action.slice(3));
+        applied.push(k.replace(/_/g,' ').replace('incl gst',''));
+      }
+    });
+    status.className = applied.length ? 'ai-status success' : 'ai-status error';
+    status.textContent = applied.length ? '✓ Applied: ' + applied.slice(0,5).join(', ') : '⚠ No values found. Add more details like rates/totals.';
+  } catch(e) {
+    status.className = 'ai-status error';
+    status.textContent = '✗ ' + e.message;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CAPEX
+// ═══════════════════════════════════════════════
+const CAPEX_CATS = [
+  {key:'cold',   label:'Cold Water Meters',                    ppu:true},
+  {key:'hot',    label:'Hot Water Meters',                     ppu:true},
+  {key:'power',  label:'Power / Electricity Meters',           ppu:false},
+  {key:'gas',    label:'Gas Meters',                           ppu:false},
+  {key:'pulse',  label:'Pulse Units & Cables',                 ppu:false},
+  {key:'config', label:'Configuration & Installation',         ppu:false},
+  {key:'base',   label:'Base Stations & Installation',         ppu:false},
+  {key:'other',  label:'Other (Setup Fee, Delivery, Customs)', ppu:false},
+];
+
+function renderCapexSections() {
+  const wrap = document.getElementById('capex-sections');
+  wrap.innerHTML = '';
+  CAPEX_CATS.forEach(cat => {
+    const isMeter = METER_CATS_SET.has(cat.key);
+    const d = document.createElement('div');
+    d.className = 'card';
+    d.innerHTML = `<div class="card-title">${cat.label}</div>
+      ${!isMeter ? '<div class="capex-row hdr"><span>Item</span><span>Qty</span><span>Our Cost (NZD)</span><span>Sell Price</span><span>Margin</span><span></span></div>' : ''}
+      <div id="cx-rows-${cat.key}"></div>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-sm" onclick="addCxRow('${cat.key}')">+ Add row</button>
+        <span style="font-size:12px;color:var(--text3)">Cost:<span id="cx-cost-${cat.key}" style="color:var(--text);font-family:'DM Mono',monospace;margin-left:4px">$0</span>  Sell:<span id="cx-sell-${cat.key}" style="color:var(--green);font-family:'DM Mono',monospace;margin-left:4px">$0</span>${cat.ppu?'  /unit:<span id="cx-ppu-'+cat.key+'" style="color:var(--accent);font-family:\'DM Mono\',monospace;margin-left:4px">$0</span>':''}</span>
+      </div>`;
+    wrap.appendChild(d);
+    renderCxRows(cat.key);
+  });
+  updateCxTotals();
+}
+
+const METER_CATS_SET = new Set(['cold','hot','power','gas','base','config']);
+
+// Row types: 'meter' = mfr+model dropdowns, 'dbselect' = single item dropdown, 'text' = free text
+function rowType(catKey) {
+  if(['cold','hot','power','gas'].includes(catKey)) return 'meter';
+  if(['base','config'].includes(catKey)) return 'dbselect';
+  return 'text';
+}
+
+function renderCxRows(catKey) {
+  const wrap = document.getElementById('cx-rows-'+catKey);
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const rtype = rowType(catKey);
+
+  (S.capexData[catKey]||[]).forEach((row, i) => {
+    const sellAdj = row.sell * S.capMult;
+    const margin = row.cost > 0 ? ((sellAdj/row.cost-1)*100).toFixed(0)+'%' : '—';
+    const cls = sellAdj >= row.cost ? 'badge-green' : 'badge-red';
+    const div = document.createElement('div');
+
+    if(rtype === 'meter') {
+      // Manufacturer → Model/Diameter → Qty | Cost (auto) | Sell (editable) | Margin
+      const mfrs = [...new Set(S.equipDB.filter(e => e.cat===catKey && e.mfr).map(e => e.mfr))];
+      const models = S.equipDB.filter(e => e.cat===catKey && (!row.mfr || e.mfr===row.mfr));
+      const mfrOpts = `<option value="">— Manufacturer —</option>` + mfrs.map(m =>
+        `<option value="${m}"${m===row.mfr?' selected':''}>${m}</option>`).join('');
+      const modelOpts = `<option value="">— Model / Diameter —</option>` + models.map(m => {
+        const label = [m.diam, m.name].filter(Boolean).join(' — ');
+        const val = `${m.diam||''}|${m.name}`;
+        const sel = (row.mfr===m.mfr && row.diam===m.diam && row.name===m.name) ? ' selected' : '';
+        return `<option value="${val}"${sel}>${label}</option>`;
+      }).join('');
+      if(i === 0) {
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'display:grid;grid-template-columns:1fr 1.4fr 60px 90px 90px 64px 26px;gap:6px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding-bottom:4px';
+        hdr.innerHTML = '<span>Manufacturer</span><span>Model / Diameter</span><span>Qty</span><span>Cost (NZD)</span><span>Sell Price</span><span>Margin</span><span></span>';
+        wrap.appendChild(hdr);
+      }
+      div.style.cssText = 'display:grid;grid-template-columns:1fr 1.4fr 60px 90px 90px 64px 26px;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)';
+      div.innerHTML = `
+        <select style="font-size:12px;padding:5px 7px" onchange="cxMfrChange('${catKey}',${i},this.value)">${mfrOpts}</select>
+        <select style="font-size:12px;padding:5px 7px" onchange="cxModelChange('${catKey}',${i},this.value)">${modelOpts}</select>
+        <input type="number" value="${row.qty||0}" min="0" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].qty=+this.value;updateCxTotals()">
+        <input type="number" value="${(row.cost||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px;color:var(--text3)" readonly title="Auto-filled from DB">
+        <input type="number" value="${(row.sell||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].sell=+this.value;updateCxTotals()">
+        <span class="badge ${cls}" style="justify-content:center">${margin}</span>
+        <button class="btn btn-sm" style="padding:2px 5px;color:var(--red);border-color:transparent" onclick="delCxRow('${catKey}',${i})">×</button>`;
+
+    } else if(rtype === 'dbselect') {
+      // Single dropdown: all items of this category from DB
+      const items = S.equipDB.filter(e => e.cat===catKey);
+      const itemOpts = `<option value="">— Select item —</option>` + items.map(item => {
+        const label = [item.mfr, item.name].filter(Boolean).join(' — ');
+        const val = item.name;
+        const sel = row.name===item.name ? ' selected' : '';
+        return `<option value="${val}"${sel}>${label}</option>`;
+      }).join('');
+      if(i === 0) {
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'display:grid;grid-template-columns:2fr 60px 90px 90px 64px 26px;gap:6px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding-bottom:4px';
+        hdr.innerHTML = '<span>Item</span><span>Qty</span><span>Cost (NZD)</span><span>Sell Price</span><span>Margin</span><span></span>';
+        wrap.appendChild(hdr);
+      }
+      div.style.cssText = 'display:grid;grid-template-columns:2fr 60px 90px 90px 64px 26px;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)';
+      div.innerHTML = `
+        <select style="font-size:12px;padding:5px 7px" onchange="cxDbSelect('${catKey}',${i},this.value)">${itemOpts}</select>
+        <input type="number" value="${row.qty||0}" min="0" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].qty=+this.value;updateCxTotals()">
+        <input type="number" value="${(row.cost||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px;color:var(--text3)" readonly title="Auto-filled from DB">
+        <input type="number" value="${(row.sell||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].sell=+this.value;updateCxTotals()">
+        <span class="badge ${cls}" style="justify-content:center">${margin}</span>
+        <button class="btn btn-sm" style="padding:2px 5px;color:var(--red);border-color:transparent" onclick="delCxRow('${catKey}',${i})">×</button>`;
+
+    } else {
+      // Free text
+      div.className = 'capex-row';
+      div.innerHTML = `
+        <input type="text" value="${row.name||''}" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].name=this.value">
+        <input type="number" value="${row.qty||0}" min="0" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].qty=+this.value;updateCxTotals()">
+        <input type="number" value="${(row.cost||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].cost=+this.value;updateCxTotals()">
+        <input type="number" value="${(row.sell||0).toFixed(2)}" min="0" step="0.01" style="font-size:12px;padding:5px 7px" onchange="S.capexData['${catKey}'][${i}].sell=+this.value;updateCxTotals()">
+        <span class="badge ${cls}">${margin}</span>
+        <button class="btn btn-sm" style="padding:2px 5px;color:var(--red);border-color:transparent" onclick="delCxRow('${catKey}',${i})">×</button>`;
+    }
+    wrap.appendChild(div);
+  });
+}
+
+// DB-select item chosen (base/config) — auto-fill cost + sell
+function cxDbSelect(catKey, i, name) {
+  S.capexData[catKey][i].name = name;
+  const item = S.equipDB.find(e => e.cat===catKey && e.name===name);
+  if(item) {
+    S.capexData[catKey][i].cost = parseFloat((item.buy * fx(item.ccy)).toFixed(2));
+    S.capexData[catKey][i].sell = item.sell;
+    S.capexData[catKey][i].mfr = item.mfr || '';
+  }
+  renderCxRows(catKey);
+  updateCxTotals();
+}
+
+// Manufacturer changed in meter row — reset model
+function cxMfrChange(catKey, i, mfr) {
+  S.capexData[catKey][i].mfr = mfr;
+  S.capexData[catKey][i].diam = '';
+  S.capexData[catKey][i].name = '';
+  S.capexData[catKey][i].cost = 0;
+  S.capexData[catKey][i].sell = 0;
+  renderCxRows(catKey);
+  updateCxTotals();
+}
+
+// Model/diameter changed in meter row — auto-fill cost + sell
+function cxModelChange(catKey, i, val) {
+  const [diam, ...nameParts] = val.split('|');
+  const name = nameParts.join('|');
+  S.capexData[catKey][i].diam = diam;
+  S.capexData[catKey][i].name = name;
+  const row = S.capexData[catKey][i];
+  const item = S.equipDB.find(e => e.cat===catKey && e.mfr===row.mfr && e.diam===diam && e.name===name) ||
+               S.equipDB.find(e => e.cat===catKey && e.mfr===row.mfr && e.diam===diam) || null;
+  if(item) {
+    S.capexData[catKey][i].cost = parseFloat((item.buy * fx(item.ccy)).toFixed(2));
+    S.capexData[catKey][i].sell = item.sell;
+  }
+  renderCxRows(catKey);
+  updateCxTotals();
+}
+
+function addCxRow(k) {
+  if(!S.capexData[k]) S.capexData[k]=[];
+  const rt = rowType(k);
+  if(rt === 'meter') {
+    S.capexData[k].push({ mfr:'', diam:'', name:'', qty:1, cost:0, sell:0 });
+  } else if(rt === 'dbselect') {
+    S.capexData[k].push({ name:'', qty:1, cost:0, sell:0 });
+  } else {
+    S.capexData[k].push({ name:'New item', qty:1, cost:0, sell:0 });
+  }
+  renderCxRows(k);
+  updateCxTotals();
+}
+function delCxRow(k,i) { S.capexData[k].splice(i,1); renderCxRows(k); updateCxTotals(); }
+
+function updateCxTotals() {
+  let gC=0,gS=0;
+  CAPEX_CATS.forEach(cat => {
+    let cC=0,cS=0;
+    (S.capexData[cat.key]||[]).forEach(r => { cC+=r.qty*r.cost; cS+=r.qty*r.sell; });
+    gC+=cC; gS+=cS;
+    set('cx-cost-'+cat.key, nzd(cC));
+    set('cx-sell-'+cat.key, nzd(cS*S.capMult));
+    if(cat.ppu) {
+      const meterQty = (S.capexData[cat.key]||[]).reduce((s,r)=>s+r.qty,0);
+      set('cx-ppu-'+cat.key, nzd(cS*S.capMult/Math.max(meterQty,1))+'/unit');
+    }
+  });
+  const sellAdj=gS*S.capMult, profit=sellAdj-gC;
+  set('cap-our-cost', nzd(gC));
+  set('cap-sell-price', nzd(sellAdj));
+  set('cap-profit', nzd(profit));
+  set('cap-margin', gS>0 ? pct(profit/sellAdj) : '0%');
+  renderMeterSummary();
+}
+
+function getCapexTotals() {
+  let cost=0,sell=0;
+  CAPEX_CATS.forEach(cat => { (S.capexData[cat.key]||[]).forEach(r => { cost+=r.qty*r.cost; sell+=r.qty*r.sell; }); });
+  return { cost, sell: sell*S.capMult };
+}
+
+// ═══════════════════════════════════════════════
+// METER SUMMARY (Deal Info — read-only, driven by CAPEX)
+// ═══════════════════════════════════════════════
+function renderMeterSummary() {
+  const wrap = document.getElementById('meter-summary');
+  if(!wrap) return;
+  const catLabels = { cold:'Cold Water', hot:'Hot Water', power:'Power', gas:'Gas' };
+  const lines = [];
+  let grandTotal = 0;
+  Object.entries(catLabels).forEach(([cat, label]) => {
+    const rows = (S.capexData[cat]||[]).filter(r => r.qty > 0);
+    rows.forEach(r => {
+      const desc = [r.mfr, r.diam, r.name].filter(Boolean).join(' ') || label + ' meter';
+      lines.push(`<div class="output-line"><span>${label} — ${desc}</span><span class="val">${r.qty} units</span></div>`);
+      grandTotal += r.qty;
+    });
+  });
+  if(lines.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:4px 0">No meters configured yet. Go to CAPEX to add meter types.</div>';
+  } else {
+    wrap.innerHTML = '<div class="output-box" style="margin-top:4px">' + lines.join('') +
+      `<div class="output-line total"><span>Total meters</span><span class="val">${grandTotal}</span></div></div>`;
+  }
+}
+
+
+let eqFilter = 'all';
+
+function setEqFilter(cat, el) {
+  eqFilter = cat;
+  document.querySelectorAll('.eq-pill').forEach(p => p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  if(cat !== 'all') setv('eq-cat', cat);
+  renderEqTable();
+}
+
+function addEquipment() {
+  const name = document.getElementById('eq-name').value.trim();
+  if(!name) return;
+  const cat = document.getElementById('eq-cat').value;
+  S.equipDB.push({
+    cat, name,
+    mfr: document.getElementById('eq-mfr').value,
+    diam: document.getElementById('eq-diam').value,
+    ccy: document.getElementById('eq-ccy').value,
+    buy: parseFloat(document.getElementById('eq-buy').value)||0,
+    sell: parseFloat(document.getElementById('eq-sell').value)||0,
+  });
+  // snap filter to show the newly added category
+  eqFilter = cat;
+  document.querySelectorAll('.eq-pill').forEach(p => {
+    const match = p.getAttribute('onclick')?.includes(`'${cat}'`);
+    p.classList.toggle('active', !!match);
+  });
+  renderEqTable();
+  renderMeterSummary();
+  // clear fields except category
+  ['eq-name','eq-mfr','eq-buy','eq-sell'].forEach(id => setv(id,''));
+  setv('eq-diam','');
+  saveGlobalDB(); // persist immediately
+}
+
+function delEquipment(idx) {
+  const name = S.equipDB[idx]?.name || 'this item';
+  if(!confirm(`Remove "${name}" from the database?`)) return;
+  S.equipDB.splice(idx, 1);
+  saveGlobalDB();
+  renderEqTable();
+}
+
+function renderEqTable() {
+  const cats = {cold:'Cold Water',hot:'Hot Water',power:'Power',gas:'Gas',pulse:'Pulse',config:'Config & Install',base:'Base Station',other:'Other'};
+  const filtered = eqFilter === 'all' ? S.equipDB : S.equipDB.filter(e => e.cat === eqFilter);
+  const wrap = document.getElementById('eq-table');
+  if(!wrap) return;
+  if(filtered.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;text-align:center">No items in this category yet — add one above.</div>';
+    return;
+  }
+  let h = '<table class="rates-table" style="width:100%"><thead><tr><th>Category</th><th>Name</th><th>Manufacturer</th><th>Diameter</th><th>Buy (foreign)</th><th>Buy (NZD)</th><th>Sell (NZD)</th><th>Margin</th><th></th></tr></thead><tbody>';
+  filtered.forEach(item => {
+    const realIdx = S.equipDB.indexOf(item);
+    const bn = item.buy * fx(item.ccy);
+    const mg = item.sell > 0 ? ((item.sell/bn-1)*100).toFixed(0)+'%' : '—';
+    const cls = item.sell >= bn ? 'badge-green' : 'badge-red';
+    h += `<tr>
+      <td><span class="badge badge-gray">${cats[item.cat]||item.cat}</span></td>
+      <td style="font-weight:500">${item.name}</td>
+      <td style="color:var(--text2)">${item.mfr||'—'}</td>
+      <td style="color:var(--text2)">${item.diam||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text2)">${item.buy} ${item.ccy}</td>
+      <td style="font-family:'DM Mono',monospace">${bn.toFixed(2)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--green);font-weight:500">${item.sell}</td>
+      <td><span class="badge ${cls}">${mg}</span></td>
+      <td><button class="btn btn-sm" style="padding:2px 7px;color:var(--red);border-color:transparent" onclick="delEquipment(${realIdx})">×</button></td>
+    </tr>`;
+  });
+  wrap.innerHTML = h + '</tbody></table>';
+}
+
+// ═══════════════════════════════════════════════
+// SIMULATOR
+// ═══════════════════════════════════════════════
+function getOngoingRev() { return S.simUnits * S.svcFee * 12; }
+function getOngoingCost() { return gv('wc-annual')/1.15 + gv('energy-annual'); }
+
+function buildYears() {
+  const {cost:cxCost, sell:cxSell} = getCapexTotals();
+  const ongoing = getOngoingRev();
+  const ongoingCost = getOngoingCost();
+  return Array.from({length:S.simLen},(_,i) => {
+    const y=i+1, cxR=y===1?cxSell:0, cxC=y===1?cxCost:0;
+    return {year:y, capexRev:cxR, ongoing, total:cxR+ongoing, netProfit:(cxR-cxC)+(ongoing-ongoingCost)};
+  });
+}
+
+function renderSimulator() {
+  const years=buildYears();
+  const cx=getCapexTotals();
+  const ongoing=getOngoingRev(), ongoingCost=getOngoingCost();
+  const totalRev=cx.sell+ongoing*S.simLen;
+  const totalCost=cx.cost+ongoingCost*S.simLen;
+  const profit=totalRev-totalCost;
+  const margin=totalRev>0?profit/totalRev:0;
+
+  set('sim-total-rev', nzd(totalRev));
+  set('sim-total-sub', 'over '+S.simLen+' yr'+(S.simLen!==1?'s':''));
+  set('sim-capex-rev', nzd(cx.sell));
+  set('sim-ongoing-rev', nzd(ongoing));
+  set('sim-profit', nzd(profit));
+  set('sim-profit-sub', pct(margin)+' margin');
+  document.getElementById('sim-profit-card').className='metric '+(profit>=0?'green':'red');
+
+  // year bars
+  const maxV=Math.max(...years.map(y=>y.total),1);
+  document.getElementById('year-bars').innerHTML = years.map(y=>{
+    const cW=Math.round(y.capexRev/maxV*100), oW=Math.round(y.ongoing/maxV*100);
+    const cf=cW>0?`<div class="year-fill" style="width:${cW}%;background:var(--accent);border-radius:${oW?'6px 0 0 6px':'6px'}">${cW>12?nzd(y.capexRev):''}</div>`:'';
+    const of=oW>0?`<div class="year-fill" style="width:${oW}%;background:var(--purple);border-radius:${cW?'0 6px 6px 0':'6px'}">${oW>12?nzd(y.ongoing):''}</div>`:'';
+    return `<div class="year-bar"><div class="year-lbl">Yr ${y.year}</div><div class="year-track">${cf}${of}</div><div class="year-amt">${nzd(y.total)}</div></div>`;
+  }).join('');
+
+  // cashflow chart
+  if(S.cfChart){S.cfChart.destroy();S.cfChart=null;}
+  S.cfChart=new Chart(document.getElementById('cf-chart'),{
+    type:'bar',
+    data:{labels:years.map(y=>'Year '+y.year),datasets:[
+      {label:'CAPEX',data:years.map(y=>Math.round(y.capexRev)),backgroundColor:'rgba(61,155,255,0.7)',borderRadius:4,stack:'rev'},
+      {label:'Ongoing',data:years.map(y=>Math.round(y.ongoing)),backgroundColor:'rgba(160,124,245,0.7)',borderRadius:4,stack:'rev'},
+      {label:'Net Profit',data:years.map(y=>Math.round(y.netProfit)),type:'line',borderColor:'#21c55d',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:'#21c55d',tension:.3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8893a8',font:{family:'DM Mono',size:11}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#8893a8',font:{family:'DM Mono',size:11},callback:v=>'$'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'rgba(255,255,255,0.06)'}}
+      }
+    }
+  });
+
+  // mix chart
+  if(S.mixChart){S.mixChart.destroy();S.mixChart=null;}
+  S.mixChart=new Chart(document.getElementById('mix-chart'),{
+    type:'doughnut',
+    data:{labels:['CAPEX','Ongoing'],datasets:[{data:[Math.max(cx.sell,0),Math.max(ongoing*S.simLen,0)],backgroundColor:['rgba(61,155,255,0.8)','rgba(160,124,245,0.8)'],borderColor:'#0c0f16',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'65%'}
+  });
+  const pC=totalRev>0?Math.round(cx.sell/totalRev*100):0;
+  document.getElementById('mix-legend').innerHTML = `■ CAPEX ${pC}% (${nzd(cx.sell)})   ■ Ongoing ${100-pC}% (${nzd(ongoing*S.simLen)})`;
+
+  // P&L
+  const rows=[
+    ['─── CAPEX ───',''],
+    ['Equipment + Install (sell price)', nzd(cx.sell)],
+    ['Equipment + Install (our cost)', '('+nzd(cx.cost)+')'],
+    ['CAPEX gross profit', nzd(cx.sell-cx.cost)],
+    ['',''],
+    ['─── ONGOING (×'+S.simLen+' years) ───',''],
+    ['Service fees ('+S.simUnits+' units × $'+S.svcFee.toFixed(2)+'/mo × 12)', nzd(ongoing*S.simLen)],
+    ['Water cost to SM (Watercare excl. GST + energy)', '('+nzd(ongoingCost*S.simLen)+')'],
+    ['Ongoing net profit', nzd((ongoing-ongoingCost)*S.simLen)],
+    ['',''],
+    ['TOTAL REVENUE', nzd(totalRev)],
+    ['TOTAL COST', '('+nzd(totalCost)+')'],
+    ['NET PROFIT', nzd(profit)],
+    ['MARGIN', pct(margin)],
+  ];
+  document.getElementById('pnl-detail').innerHTML = rows.map(([k,v])=>{
+    if(!k&&!v) return '<div style="height:5px"></div>';
+    const isT=['TOTAL REVENUE','TOTAL COST','NET PROFIT','MARGIN'].includes(k);
+    const isH=k.startsWith('─');
+    return `<div class="output-line ${isT?'total':''}" style="${isH?'color:var(--text3);margin-top:3px':''}"><span>${k}</span><span class="val">${v}</span></div>`;
+  }).join('');
+}
+
+function onSvcFee(){S.svcFee=gv('sim-svc-fee');set('svc-fee-val','$'+S.svcFee.toFixed(2));renderSimulator();}
+function onSimUnits(){S.simUnits=gvi('sim-units');set('sim-units-val',S.simUnits);renderSimulator();}
+function onSimLen(){S.simLen=gvi('sim-len');set('sim-len-val',S.simLen+' yrs');renderSimulator();}
+function onCapMult(){S.capMult=gv('sim-cap-mult');set('cap-mult-val',S.capMult.toFixed(2)+'×');updateCxTotals();renderSimulator();}
+function recalcAll(){updateCxTotals();renderEqTable();}
+
+// ═══════════════════════════════════════════════
+// PROPOSAL
+// ═══════════════════════════════════════════════
+function renderProposal() {
+  set('prop-name', gvs('cust-name')||'Unnamed');
+  const tags=[];
+  ['cold','hot','gas','power'].forEach(s=>{if(document.getElementById('svc-'+s)?.checked)tags.push(`<span class="tag tag-blue">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`);});
+  tags.push(`<span class="tag tag-green">${S.svcType==='billing'?'Full Billing':S.svcType==='data'?'Data Only':'Hardware Only'}</span>`);
+  tags.push(`<span class="tag tag-amber">${S.simLen}-Year Contract</span>`);
+  document.getElementById('prop-tags').innerHTML=tags.join('');
+
+  const rateRows=prefix=>{
+    return [['Supply Charge / Day',prefix+'-supply'],['Cold Water / kL',prefix+'-cold'],['Hot Water / kL',prefix+'-hot'],
+      ['Wastewater / kL',prefix+'-waste'],['SM Service Fee / month',prefix+'-service'],['Power / kWh',prefix+'-power']]
+      .filter(([,id])=>!!document.getElementById(id+'-gst'))
+      .map(([label,id])=>{const i=gv(id+'-gst'),x=(i/1.15).toFixed(4);return `<div class="rate-cell rate-cell-head">${label}</div><div class="rate-cell"><div class="rate-cell-val">${nzdf(i)}</div><div class="rate-cell-gst">incl. GST</div></div><div class="rate-cell"><div class="rate-cell-val">${nzdf(parseFloat(x))}</div><div class="rate-cell-gst">excl. GST</div></div>`;}).join('');
+  };
+  document.getElementById('prop-rate1').innerHTML='<div class="rate-cell rate-cell-head" style="font-weight:700">Charge</div><div class="rate-cell rate-cell-head">Incl. GST</div><div class="rate-cell rate-cell-head">Excl. GST</div>'+rateRows('r1');
+  const hasR2=gvi('commercial-units')>0;
+  document.getElementById('prop-rate2-wrap').style.display=hasR2?'block':'none';
+  if(hasR2) document.getElementById('prop-rate2').innerHTML='<div class="rate-cell rate-cell-head" style="font-weight:700">Charge</div><div class="rate-cell rate-cell-head">Incl. GST</div><div class="rate-cell rate-cell-head">Excl. GST</div>'+rateRows('r2');
+
+  const {sell}=getCapexTotals();
+  let capH='';
+  CAPEX_CATS.forEach(cat=>{(S.capexData[cat.key]||[]).filter(r=>r.qty>0).forEach(r=>{capH+=`<div class="output-line"><span>${r.name||[r.mfr,r.diam].filter(Boolean).join(' ')} × ${r.qty}</span><span class="val">${nzd(r.qty*r.sell*S.capMult)}</span></div>`;});});
+  capH+=`<div class="output-line total"><span>TOTAL CAPEX (excl. GST)</span><span class="val">${nzd(sell)}</span></div>`;
+  document.getElementById('prop-capex').innerHTML = capH;
+
+  const ongoing=getOngoingRev();
+  const svcL=S.svcType==='billing'?'Full Billing':S.svcType==='data'?'Data Only':'Hardware Only';
+  document.getElementById('prop-ongoing').innerHTML = `<div class="output-line"><span>Service Model</span><span class="val">${svcL}</span></div><div class="output-line"><span>Billing Units</span><span class="val">${S.simUnits}</span></div><div class="output-line"><span>Service Fee (excl. GST)</span><span class="val">$${S.svcFee.toFixed(2)}/unit/month</span></div><div class="output-line total"><span>Annual Recurring Revenue</span><span class="val">${nzd(ongoing)}</span></div>`;
+
+  const dl=[['Address_Building',gvs('cust-name')],['Address_Street',gvs('cust-address')],['Address_Suburb',gvs('cust-suburb')],
+    ['Address_TotalUnits',gvi('total-units')],['Address_NumApartments',gvi('apartments')],['Address_CommunalOutlets',gvi('communal')],
+    ['Address_CommercialUnits',gvi('commercial-units')],['Charge_Supply_InclGST',gv('r1-supply-gst')],
+    ['Charge_Cold_InclGST',gv('r1-cold-gst')],['Charge_Hot_InclGST',gv('r1-hot-gst')],
+    ['Charge_WasteWater_InclGST',gv('r1-waste-gst')],['Charge_Service_InclGST',gv('r1-service-gst')],
+    ['Charge_Service_ExGST',(gv('r1-service-gst')/1.15).toFixed(2)],
+    ['CAPEX_TotalSell',nzd(sell)],['Ongoing_AnnualRevenue',nzd(ongoing)],
+    ['Contract_Years',S.simLen],['Start_Date',gvs('start-date')],
+    ['Meters_Cold', (S.capexData.cold||[]).reduce((s,r)=>s+(r.qty||0),0)],
+    ['Meters_Hot',  (S.capexData.hot||[]).reduce((s,r)=>s+(r.qty||0),0)],
+    ['Meters_Power',(S.capexData.power||[]).reduce((s,r)=>s+(r.qty||0),0)],
+    ['Meters_Gas',  (S.capexData.gas||[]).reduce((s,r)=>s+(r.qty||0),0)],
+    ['Watercare_Annual',nzd(gv('wc-annual'))],
+  ];
+  document.getElementById('prop-doclink').innerHTML = dl.map(([k,v])=>`<div class="output-line"><span>${k}</span><span class="val">${v}</span></div>`).join('');
+}
+
+function exportDB() {
+  const payload = { items: S.equipDB, updatedAt: Date.now(), type: 'sm_equipdb' };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sm-equipment-db-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importDB(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      const items = d.items || d.equipDB || (Array.isArray(d) ? d : null);
+      if(!items || items.length === 0) { alert('No equipment items found in this file.'); return; }
+      const count = items.length;
+      if(!confirm(`Import ${count} items into the Equipment DB? This will replace your current DB.`)) return;
+      S.equipDB = items;
+      saveGlobalDB();
+      eqFilter = 'all';
+      document.querySelectorAll('.eq-pill').forEach((p,i) => p.classList.toggle('active', i===0));
+      renderEqTable();
+      renderMeterSummary();
+      alert(`✓ Imported ${count} items successfully.`);
+    } catch(err) { alert('Could not import: ' + err.message); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init() {
+  // Load global Equipment DB first — overrides the hardcoded defaults if browser has saved data
+  loadGlobalDB();
+  renderPicker();
+  document.getElementById('deal-picker').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  initExGst(); updateContractLen(); syncServices(); checkRate2();
+  renderCapexSections(); renderEqTable(); renderMeterSummary();
+}
+init();
+</script>
+</body>
+</html>
